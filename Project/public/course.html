@@ -1,0 +1,425 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Главное меню</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+          integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+</head>
+<body>
+<div>
+    <div id="title"></div>
+    <a href="/"><button class="btn btn-primary">Назад</button></a>
+    <div id="body"></div>
+    <form id="form"></form>
+    <table id="table" class="table table-bordered"></table>
+</div>
+
+
+<script>
+
+    window.onload = function () {
+        const table = document.getElementById('table');
+        const xml = new XMLHttpRequest();
+        const body = document.getElementById('body');
+        const form = document.getElementById('form');
+        let headerCont = window.location.pathname;
+        let namePage = headerCont.slice(1)
+        let title = document.getElementById('title');
+
+
+        title.innerHTML = `<h2>${namePage}</h2>`;
+
+
+        openCourse();
+
+
+        //Функция изменения значения
+        function changePerson(id, name, dateBirth, phone, mail, dateCreate, text) {
+            let formContent = formValue(name, dateBirth, phone, mail, text);
+            form.innerHTML = formContent;
+            //достаем все необходимые эллементы
+            let buttons = document.getElementById('buttons');
+            let buttonCreate = document.getElementById('buttonCreate');
+            let buttonCancel = document.getElementById('buttonCancel');
+            let helpText = document.getElementById('helpText');
+
+            let createName = document.getElementById('name');
+            let createDateBirth = document.getElementById('dateBirth');
+            let createPhone = document.getElementById('phone');
+            let createMail = document.getElementById('mail');
+
+            //Делаем кнопку отменить
+            buttonCancel.onclick = function(){
+                form.innerHTML= '';
+                openCourse();
+            };
+
+
+            //Делаем кнопку создать
+            buttonCreate.onclick = function() {
+                // проверяем на изменения
+                if(createName.value === name &&
+                    createDateBirth.value === dateBirth &&
+                    createPhone.value === phone &&
+                    createMail.value === mail
+                ){
+                    helpText.innerHTML = '<i style="color: purple">Изменения не внесены.</i>';
+
+                    setTimeout(function () {
+                        form.innerHTML = '';
+                        openCourse();//збрасываем форму и вызываем главную функцию для обновления данных
+                    }, 1000)
+                }else {
+
+                    if(spaceSymbol(createName.value) && createDateBirth.value && createPhone.value && checkMail(createMail.value)) {
+                        helpText.innerHTML = '<i style="color: yellow">Ожидаем ответ сервера...</i>';
+                        //buttons.innerHTML = '';
+                        form.name.style.borderColor = 'green';
+                        form.dateBirth.style.borderColor = 'green';
+                        form.phone.style.borderColor = 'green';
+                        form.mail.style.borderColor = 'green';
+
+                        let changeData = {
+                            id: id,
+                            name: createName.value,
+                            dateBirth: createDateBirth.value,
+                            phone: createPhone.value,
+                            mail: createMail.value,
+                            dateCreate: dateCreate
+                        };
+                        changeData = JSON.stringify(changeData);
+
+                        //отправляем запрос
+                        xml.open('PUT', `/change${headerCont}`);
+                        xml.send(changeData);
+
+                        //обрабатываем ответ
+                        xml.onreadystatechange = function () {
+                            if (xml.readyState === 4) {
+                                if (xml.status === 200) {
+                                    if (xml.responseText === 'OK') {
+                                        helpText.innerHTML = '<i style="color: green">Переименование успешно.</i>';
+
+                                        setTimeout(function () {
+                                            form.innerHTML = '';
+                                            openCourse();//збрасываем форму и вызываем главную функцию для обновления данных
+                                        }, 1000)
+
+                                    } else if (xml.responseText === 'MAIL') {
+                                        //вызываем эту же функцию но со значениями
+                                        form.innerHTML = '';
+                                        changePerson(id, createName.value, createDateBirth.value, createPhone.value, createMail.value, dateCreate, 'Почта не уникальна, введите новое значение!');
+                                    } else if (xml.responseText === 'PHONE') {
+                                        //вызываем эту же функцию но со значениями
+                                        form.innerHTML = '';
+                                        changePerson(id, createName.value, createDateBirth.value, createPhone.value, createMail.value, dateCreate, 'Телефон не уникален, введите новое значение!');
+                                    } else {
+                                        form.innerHTML = 'Ошибка получения данных.';
+                                        openCourse();
+                                    }
+                                }
+                            }
+                        }
+                    }else {
+                        let obj ={name: spaceSymbol(createName.value), dateBirth:!!createDateBirth.value, phone: !!createPhone.value, mail: checkMail(createMail.value)};
+                        helpText.innerHTML = '<i>Заполните все поля корректно.</i>';
+                        for(let key in obj) {
+                            if(obj[key]){
+                                form[key].style.borderColor = 'green';
+
+                            }else{
+                                form[key].style.borderColor = 'red';
+                            }
+                        }
+                    }
+                }
+
+            };
+        }
+
+        //Функция проверки пробелов
+        function spaceSymbol(val) {
+            let req = / /;
+            let result = req.test(val);
+            if(result){
+                return false;
+            }else {
+                return true;
+            }
+        }
+        //Функция проверки почты
+            function checkMail(val) {
+                let reg = /\S+@\S+\.\S+/;
+                let result = reg.test(val);
+                return result;
+            }
+
+
+        //функция удаления значения
+        function deletePerson(id, name){
+            let answer = confirm(`Выдействительно хотите удалить запись "${name}"?`);
+
+            if(answer){
+                xml.open('DELETE', `/change${headerCont}`);
+                xml.send(id);
+
+                //обрабатываем ответ
+                xml.onreadystatechange = function (){
+                    if (xml.readyState === 4) {
+                        if (xml.status === 200) {
+                            if (xml.responseText === 'OK'){
+                                body.innerHTML = `<i style="color: green">Удаление ${name} успешно!</i>`;
+                                setTimeout(function(){
+                                    body.innerHTML = '';
+                                    openCourse();//обновление данных
+                                },1000)
+                            }else{
+                                body.innerHTML = `<i style="color: red">Удаление ${name} не успешна!</i>`;
+                                setTimeout(function(){
+                                    body.innerHTML = '';
+                                    openCourse();//обновление данных
+                                },1000)
+                            }
+                        } else {
+                            form.innerHTML= '<p>Ошибка получения данных.</p>';
+
+                        }
+                    }
+                }
+            }
+        }
+
+        //функция создания записи
+        function createPerson (name, dateBirth, phone, mail, text){
+            let formContent = formValue(name, dateBirth, phone, mail, text);
+            form.innerHTML = formContent;
+            //достаем все необходимые эллементы
+            let buttons = document.getElementById('buttons');
+            let buttonCreate = document.getElementById('buttonCreate');
+            let buttonCancel = document.getElementById('buttonCancel');
+            let helpText = document.getElementById('helpText');
+
+            let createName = document.getElementById('name');
+            let createDateBirth = document.getElementById('dateBirth');
+            let createPhone = document.getElementById('phone');
+            let createMail = document.getElementById('mail');
+
+            //Делаем кнопку отменить
+            buttonCancel.onclick = function(){
+                form.innerHTML= '';
+                openCourse();
+            };
+
+            buttonCreate.onclick = function(){
+
+                if(spaceSymbol(createName.value) && createDateBirth.value && createPhone.value && checkMail(createMail.value)){
+                    helpText.innerHTML = '<i style="color: yellow">Ожидаем ответ сервера...</i>';
+                    buttons.innerHTML = '';
+                    form.name.style.borderColor = 'green';
+                    form.dateBirth.style.borderColor = 'green';
+                    form.phone.style.borderColor = 'green';
+                    form.mail.style.borderColor = 'green';
+
+                    let createData = {name: createName.value, dateBirth: createDateBirth.value,phone: createPhone.value, mail:createMail.value};
+                    createData = JSON.stringify(createData);
+
+                    xml.open('POST', `/change${headerCont}`);
+                    xml.send(createData);
+
+                    //обрабатываем ответ
+                    xml.onreadystatechange = function () {
+                        if (xml.readyState === 4) {
+                            if (xml.status === 200) {
+                                if (xml.responseText === 'OK') {
+                                    helpText.innerHTML = '<i style="color: green">Сохранение успешно.</i>';
+
+                                    setTimeout(function () {
+                                        form.innerHTML = '';
+                                        openCourse();//збрасываем форму и вызываем главную функцию для обновления данных
+                                    }, 1000)
+
+                                }else if(xml.responseText === 'MAIL'){
+                                    //вызываем эту же функцию но со значениями
+                                    form.innerHTML = '';
+                                    createPerson(createName.value, createDateBirth.value, createPhone.value, createMail.value, 'Почта не уникальна, введите новое значение!');
+                                }else if(xml.responseText === 'PHONE'){
+                                    //вызываем эту же функцию но со значениями
+                                    form.innerHTML = '';
+                                    createPerson(createName.value, createDateBirth.value, createPhone.value, createMail.value, 'Телефон не уникален, введите новое значение!');
+                                }
+                            } else {
+                                form.innerHTML = '<p>Ошибка получения данных.</p>';
+                                openCourse();
+                            }
+                        }
+                    };
+
+                }else{
+                    let obj ={name: spaceSymbol(createName.value), dateBirth:!!createDateBirth.value, phone: !!createPhone.value, mail: checkMail(createMail.value)};
+                    helpText.innerHTML = '<i>Заполните все поля корректно.</i>';
+                    for(let key in obj) {
+                        if(obj[key]){
+                            form[key].style.borderColor = 'green';
+
+                        }else{
+                            form[key].style.borderColor = 'red';
+                        }
+                    }
+                }
+            }
+        }
+
+        //функция формы
+        function formValue(name, dateBirth, phone, mail, text) {
+            let nameV = name || '';
+            let dateBirthV = dateBirth || '';
+            let phoneV = phone || '';
+            let mailV = mail || '';
+            let textV = text || '';
+
+            return (`
+                <div class="form-group row">
+                    <label for="name" class="col-sm-2 col-form-label">ФИО (Пробелы заменяйте нижним прочерком)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="name" id="name" value=${nameV}>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="dateBirth" class="col-sm-2 col-form-label">Дата рождения</label>
+                    <div class="col-sm-10">
+                        <input type="date" class="form-control" name="dateBirth" id="dateBirth" value=${dateBirthV}>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="phone" class="col-sm-2 col-form-label">Телефон <span style="color: red">*</span></label>
+                    <div class="col-sm-10">
+                        <input type="number" class="form-control" name="phone" id="phone" value=${phoneV}>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="mail" class="col-sm-2 col-form-label">Почта <span style="color: red">*</span></label>
+                    <div class="col-sm-10">
+                        <input type="email" class="form-control" name="mail" id="mail" value=${mailV}>
+                    </div>
+                </div>
+                <span id="helpText" style="color: red">${textV}</span>
+                <div id="buttons">
+                    <span id="buttonCreate" class="btn btn-sm btn-primary">Сохранить</span>
+                    <span id="buttonCancel" class="btn btn-sm btn-warning">Отменить</span>
+                </div>
+                <div><span style="color: red">*</span> - <i>Уникальное значение</i></div>
+                <hr>
+            `);
+        }
+
+        //функция загрузки кнопок
+        function loadButton() {
+            //Кнопка изменить
+            let removeBtn = document.getElementsByClassName('removeBtn');
+            for (let i = 0; i < removeBtn.length; i++) {
+                removeBtn[i].onclick = function () {
+                    console.log(removeBtn[i].dataset.name);
+                    changePerson(removeBtn[i].dataset.id,
+                                    removeBtn[i].dataset.name,
+                                    removeBtn[i].dataset.datebirth,
+                                    removeBtn[i].dataset.phone,
+                                    removeBtn[i].dataset.mail,
+                                    removeBtn[i].dataset.datecreate);
+                }
+            }
+
+            //Кнопка удалить
+            let deleteBtn = document.getElementsByClassName('deleteBtn');
+            for (let i = 0; i < deleteBtn.length; i++) {
+                deleteBtn[i].onclick = function () {
+                    console.log("Удалить" + deleteBtn[i].dataset.name);
+                    deletePerson(deleteBtn[i].dataset.id, deleteBtn[i].dataset.name)
+                }
+            }
+
+            //Кнопка создать
+            let createBtn = document.getElementById('createBtn');
+            createBtn.onclick = function () {
+                console.log('Create');
+                createPerson();
+            };
+        }
+
+        //функция открыть курс
+        function openCourse() {
+            let headerCont = window.location.pathname;
+            //(`/api/${course}`)
+            xml.open('GET', `/api${headerCont}`, true);
+            xml.send();
+            xml.onreadystatechange = function() {
+                //проверяем состояние и статус
+                if (xml.readyState !== 4) {
+                } else {
+                    if (xml.status !== 200) {
+                        body.innerHTML= '<p>Ошибка получения данных.</p>';
+                    } else {
+                        let content = JSON.parse(xml.responseText);
+                        let course = (
+                            `<thead style="background-color: #bbdcfd">
+                        <tr>
+                            <th style="width: 3%">ID</th>
+                            <th style="width: 25%">ФИО</th>
+                            <th style="width: 15%">Дата рождения (год, месяц, день)</th>
+                            <th style="width: 15%">Телефон</th>
+                            <th style="width: 15%">Почта</th>
+                            <th style="width: 10%">Дата регистрации (год, месяц, день)</th>
+                        </tr>
+                    </thead><tbody>`
+                        );
+                        content.forEach(function (elem, i) {
+                            course += writeCourse(elem);
+                        });
+                        //console.log(course);
+                        course += (
+                            `<tr>
+                        <td colspan="7" class="text-center">
+                            <button id="createBtn" class="btn btn-primary btn-block">Добавить</button>
+                        </td>
+                      </tr></tbody>`
+                        );
+                        table.innerHTML = course;
+                        loadButton();
+                    }
+                }
+            };
+
+
+            function writeCourse(id) {
+                return (
+                    `<tr>
+                        <td>${id.id}</td>
+                        <td>${id.name}</td>
+                        <td>${id.dateBirth}</td>
+                        <td>${id.phone}</td>
+                        <td>${id.mail}</td>
+                        <td>${id.dateCreate}</td>
+                        <td class='text-right'>
+                          <div class='btn-group'>
+                              <button class='btn btn-success removeBtn' data-id= ${id.id}
+                                                                        data-name= ${id.name}
+                                                                        data-datebirth= ${id.dateBirth}
+                                                                        data-phone= ${id.phone}
+                                                                        data-mail= ${id.mail}
+                                                                        data-datecreate= ${id.dateCreate}>Изменить</button>
+                              <button class='btn btn-danger deleteBtn' data-id= ${id.id} data-name = ${id.name}>Удалить</button>
+                            </div>
+                        </td>
+                     </tr>`
+                )
+            }
+        }
+    };
+
+</script>
+
+</body>
+</html>
+
+
+

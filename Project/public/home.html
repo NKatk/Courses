@@ -1,0 +1,405 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Главное меню</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css"
+          integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+</head>
+<body>
+<div>
+    <h2>Welcome</h2>
+    <div id="body"></div>
+    <form id="form"></form>
+    <table id="table" class="table table-bordered"></table>
+</div>
+
+
+<script>
+
+    window.onload = function () {
+        const body = document.getElementById('body');
+        const form = document.getElementById('form');
+        const table = document.getElementById('table');
+        const xml = new XMLHttpRequest();
+
+
+        start();
+
+        //Удаление курса
+        function deleteCourse(id, nameCourse){
+            let answer = confirm(`Выдействительно хотите удалить курс "${nameCourse}"?`);
+
+            if(answer){
+                //отправляем запрос
+                xml.open('DELETE', '/api/mainChangeData');
+                xml.send(id);
+
+                //обрабатываем ответ
+                xml.onreadystatechange = function (){
+                    if (xml.readyState === 4) {
+                        if (xml.status === 200) {
+                            if (xml.responseText === 'OK'){
+                                body.innerHTML = `<i style="color: green">Удаление курса ${nameCourse} успешно!</i>`;
+                                setTimeout(function(){
+                                    body.innerHTML = '';
+                                    start();//обновление данных
+                                },1000)
+                            }else{
+                                body.innerHTML = `<i style="color: red">Удаление курса ${nameCourse} не успешна!</i>`;
+                                setTimeout(function(){
+                                    body.innerHTML = '';
+                                    start();//обновление данных
+                                },1000)
+                            }
+                        } else {
+                            form.innerHTML= 'Ошибка получения данных.';
+
+                        }
+                    }
+                }
+            }
+        }
+
+
+        //Изменение курса
+        function changeCourse(id, name, descr, valhelpText) {
+            let valT = valhelpText || '';
+            let formChangeContent = (
+                `<div class="form-group row">
+                    <label for="nameCourse" class="col-sm-2 col-form-label">Название курса <span style="color: red">*</span>(Без спецсимволов и пробелов: !?.,:;'"%&*@\=+)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="nameCourse" id="nameCourse" value=${name}>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="description" class="col-sm-2 col-form-label">Описание</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="description" id="description" value=${descr}>
+                    </div>
+                </div>
+                <span id="helpText" style="color: red"><i>${valT}</i></span>
+                <div id="buttons">
+                    <span id="buttonCreate" class="btn btn-sm btn-primary">Сохранить</span>
+                    <span id="buttonCancel" class="btn btn-sm btn-warning">Отменить</span>
+                </div>
+                <div><span style="color: red">*</span> - <i>Уникальное значение</i></div>
+                <hr>
+            `);
+
+            form.innerHTML = formChangeContent;
+
+
+            //достаем все необходимые эллементы
+            let buttons = document.getElementById('buttons');
+            let buttonCreate = document.getElementById('buttonCreate');
+            let buttonCancel = document.getElementById('buttonCancel');
+
+            let helpText = document.getElementById('helpText');
+            let nameCourse = form.nameCourse;
+            let description = form.description;
+
+            //Делаем кнопку отменить
+            buttonCancel.onclick = function(){
+                form.innerHTML= '';
+                start();
+            };
+
+
+            //Делаем кнопку создать
+            buttonCreate.onclick = function() {
+                // проверяем валидность данных
+                if(nameCourse.value === name && description.value === descr){
+                    helpText.innerHTML = '<i style="color: purple">Изменения не внесены.</i>';
+
+                    setTimeout(function () {
+                        form.innerHTML = '';
+                        start();//збрасываем форму и вызываем главную функцию для обновления данных
+                    }, 1000)
+                }else {
+
+                    if (regEx(nameCourse.value) && !!nameCourse.value && !!description.value) {
+                        form.description.style.borderColor = 'green';
+                        form.nameCourse.style.borderColor = 'green';
+                        helpText.innerHTML = '<i style="color: yellow">Ожидаем ответ сервера...</i>';
+                        buttons.innerHTML = '';
+
+
+                        let dataCourse = {id: id, nameCourse: nameCourse.value, description: description.value};
+                        dataCourse = JSON.stringify(dataCourse);
+
+                        //отправляем запрос
+                        xml.open('PUT', '/api/mainChangeData');
+                        xml.send(dataCourse);
+
+                        //обрабатываем ответ
+                        xml.onreadystatechange = function () {
+                            if (xml.readyState === 4) {
+                                if (xml.status === 200) {
+                                    if (xml.responseText === 'OK') {
+                                        helpText.innerHTML = '<i style="color: green">Курс сохранен.</i>';
+
+                                        setTimeout(function () {
+                                            form.innerHTML = '';
+                                            start();//збрасываем форму и вызываем главную функцию для обновления данных
+                                        }, 1000)
+
+                                    } else {
+                                        //вызываем эту же функцию но со значениями
+                                        form.innerHTML = '';
+                                        changeCourse(id, nameCourse.value, description.value, 'Имя не уникально, введите новое!');
+                                    }
+                                } else {
+                                    form.innerHTML = 'Ошибка получения данных.';
+                                    start();
+                                }
+                            }
+                        };
+
+                    } else {
+                        //обрабатываем не правильно введенные данные
+                        if (regEx(nameCourse.value) && !!nameCourse.value) {
+                            form.nameCourse.style.borderColor = 'green';
+                            form.description.style.borderColor = 'red';
+                            helpText.innerHTML = '<i>Заполните все поля.</i>'
+                        } else {
+                            form.description.style.borderColor = 'green';
+                            form.nameCourse.style.borderColor = 'red';
+                            helpText.innerHTML = '<i>Заполните все поля не используя спецсимволов.</i>'
+                        }
+                    }
+                }
+
+            };
+
+
+                //функция для отсеивания не нужных символов
+            function regEx (val){
+                let reg = /[?.,:;'"%&*/@\\=+! ]/gm;
+                if(reg.test(val)){
+                    return false;
+                }else{
+                    return true;
+                }
+            }
+        }
+
+
+        //Сождание нового курса
+        function createCourse(val1, val2, val3) {
+            let valF = val1 || '';//Заглушки
+            let valS = val2 || '';
+            let valT = val3 || '';
+
+            let formContent = (
+                `<div class="form-group row">
+                    <label for="nameCourse" class="col-sm-2 col-form-label">Название курса <span style="color: red">*</span>(Без спецсимволов и пробелов: !?.,:;'"%&*@\=+)</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="nameCourse" id="nameCourse" value=${valF}>
+                    </div>
+                </div>
+                <div class="form-group row">
+                    <label for="description" class="col-sm-2 col-form-label">Описание</label>
+                    <div class="col-sm-10">
+                        <input type="text" class="form-control" name="description" id="description" value=${valS}>
+                    </div>
+                </div>
+                <span id="helpText" style="color: red"><i>${valT}</i></span>
+                <div id="buttons">
+                    <span id="buttonCreate" class="btn btn-sm btn-primary">Сохранить</span>
+                    <span id="buttonCancel" class="btn btn-sm btn-warning">Отменить</span>
+                </div>
+                <div><span style="color: red">*</span> - <i>Уникальное значение</i></div>
+                <hr>
+            `);
+
+            form.innerHTML = formContent;
+
+            //достаем все необходимые эллементы
+            let buttons = document.getElementById('buttons');
+            let buttonCreate = document.getElementById('buttonCreate');
+            let buttonCancel = document.getElementById('buttonCancel');
+
+            let helpText = document.getElementById('helpText');
+            let nameCourse = form.nameCourse;
+            let description = form.description;
+
+            //Делаем кнопку отменить
+            buttonCancel.onclick = function(){
+                form.innerHTML= '';
+                start();
+            };
+
+
+            //Делаем кнопку создать
+            buttonCreate.onclick = function(){
+                // проверяем валидность данных
+                if(regEx(nameCourse.value) && !!nameCourse.value && !!description.value){
+                    form.description.style.borderColor = 'green';
+                    form.nameCourse.style.borderColor = 'green';
+                    helpText.innerHTML = '<i style="color: yellow">Ожидаем ответ сервера...</i>';
+                    buttons.innerHTML = '';
+
+
+                    let dataCourse = {nameCourse: nameCourse.value, description: description.value};
+                    dataCourse = JSON.stringify(dataCourse);
+
+                    //отправляем запрос
+                    xml.open('POST', '/api/mainChangeData');
+                    xml.send(dataCourse);
+
+                    //обрабатываем ответ
+                    xml.onreadystatechange = function (){
+                        if (xml.readyState === 4) {
+                            if (xml.status === 200) {
+                                if (xml.responseText === 'OK'){
+                                    helpText.innerHTML = '<i style="color: green">Курс сохранен.</i>';
+
+                                    setTimeout(function(){
+                                        form.innerHTML= '';
+                                        start();//збрасываем форму и вызываем главную функцию для обновления данных
+                                    },1000)
+
+                                }else{
+                                    //вызываем эту же функцию но со значениями
+                                    form.innerHTML= '';
+                                    createCourse(nameCourse.value, description.value, 'Имя не уникально, введите новое!');
+                                }
+                            } else {
+                                form.innerHTML= 'Ошибка получения данных.';
+                                start();
+                            }
+                        }
+                    };
+
+                }else{
+                    //обрабатываем не правильно введенные данные
+                    if(regEx(nameCourse.value) && !!nameCourse.value){
+                        form.nameCourse.style.borderColor = 'green';
+                        form.description.style.borderColor = 'red';
+                        helpText.innerHTML = '<i>Заполните все поля.</i>'
+                    }else{
+                        form.description.style.borderColor = 'green';
+                        form.nameCourse.style.borderColor = 'red';
+                        helpText.innerHTML = '<i>Заполните все поля не используя спецсимволов.</i>'
+                    }
+                }
+
+
+            };
+
+            //функция для отсеивания не нужных символов
+            function regEx (val){
+                let reg = /[?.,:;'"%&*/@\\=+!\ ]/gm;
+                if(reg.test(val)){
+                    return false;
+                }else{
+                    return true;
+                }
+            }
+        }
+
+
+        //Функция загрузок кнопки
+        function loadButton() {
+            //Кнопка изменить
+            let removeBtn = document.getElementsByClassName('removeBtn');
+            for (let i = 0; i < removeBtn.length; i++) {
+                removeBtn[i].onclick = function () {
+                    changeCourse(removeBtn[i].dataset.id, removeBtn[i].dataset.name, removeBtn[i].dataset.description)
+                }
+            }
+
+            //Кнопка удалить
+            let deleteBtn = document.getElementsByClassName('deleteBtn');
+            for (let i = 0; i < deleteBtn.length; i++) {
+                deleteBtn[i].onclick = function () {
+                    deleteCourse(deleteBtn[i].dataset.id, deleteBtn[i].dataset.link)
+                }
+            }
+
+            //Кнопка создать
+            let createBtn = document.getElementById('createBtn');
+            createBtn.onclick = function () {
+                createCourse();
+            };
+        }
+
+
+        //функция начальной страници
+        function start() {
+            //получаем данные
+            xml.open('GET', '/api/courses', true);
+            xml.send();
+            xml.onreadystatechange = function() {
+                //проверяем состояние и статус
+                if (xml.readyState !== 4) {
+                } else {
+                    if (xml.status !== 200) {
+                        body.innerHTML= '<p>Ошибка получения данных.</p>';
+                    } else {
+                        //работаем с полученніми данніми
+                        let content = JSON.parse(xml.responseText);
+                        //создаем шаблон
+                        let courses = (
+                            `<thead style="background-color: #bbdcfd">
+                        <tr>
+                            <th style="width: 4%">ID</th>
+                            <th style="width: 20%">Название кура</th>
+                            <th style="width: 55%">Описание</th>
+                        </tr>
+                    </thead><tbody>`
+                        );
+                        //записываем данные в таблицу
+                        content.forEach(function (id) {
+
+                            courses += writeCourses(id);
+
+                        });
+                        //закрываем шаблон
+                        courses += (
+                            `<tr>
+                        <td colspan="4" class="text-center">
+                            <button id="createBtn" class="btn btn-primary btn-block">Добавить</button>
+                        </td>
+                    </tr></tbody>`
+                        );
+
+                        table.innerHTML = courses;
+                        loadButton();
+
+                    }
+
+                }
+
+            };
+
+            //функция записи данных в таблицу
+            function writeCourses(id) {
+                return (
+                    `<tr>
+                        <td> ${id.id}</td>
+                        <td> ${id.nameCourse} </td>
+                        <td> ${id.description} </td>
+                        <td class='text-right'>
+                            <div class='btn-group'>
+                                <a href=${id.linkCollection}><button class='btn btn-primary linkBtn'>Перейти</button></a>
+                                <button class='btn btn-success removeBtn' data-id= ${id.id} data-name = ${id.nameCourse} data-description = ${id.description}>Изменить</button>
+                                <button class='btn btn-danger deleteBtn' data-id= ${id.id} data-link = ${id.nameCourse}>Удалить</button>
+                            </div>
+                        </td>
+                    </tr>`
+                )
+            }
+
+        }
+
+    };
+
+</script>
+
+</body>
+</html>
+
+
+
